@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer Service Queue</title>
+  <style>
+    :root { color-scheme:light; --ink:#18251f; --muted:#65746c; --line:#e2e9e4; --green:#18754a; --bg:#f4f8f5; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif }
+    main { width:min(760px,calc(100% - 32px)); margin:48px auto }
+    header { margin-bottom:24px }
+    h1 { margin:0 0 6px; font-size:clamp(28px,5vw,38px); letter-spacing:-.03em }
+    header p { margin:0; color:var(--muted) }
+    .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:24px; margin:16px 0; box-shadow:0 8px 28px #18251f0a }
+    .top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap }
+    .top strong { font-size:18px }
+    .pill { padding:5px 11px; border-radius:999px; background:#e9f6ee; color:#17633f; font-size:14px; font-weight:650 }
+    form { display:flex; gap:10px; margin-top:18px }
+    input { flex:1; min-width:0; padding:12px 14px; border:1px solid #cbd7ce; border-radius:9px; font:inherit }
+    input:focus { outline:3px solid #18754a33; border-color:var(--green) }
+    button { border:0; border-radius:9px; padding:11px 16px; background:var(--green); color:#fff; font:inherit; font-weight:650; cursor:pointer }
+    button:hover { filter:brightness(.94) }
+    button:focus-visible { outline:3px solid #18754a66; outline-offset:2px }
+    button.secondary { background:#edf1ee; color:var(--ink) }
+    button:disabled { opacity:.48; cursor:not-allowed }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px }
+    h2 { margin:0 0 14px; font-size:18px }
+    .person { display:flex; align-items:center; gap:14px; padding:13px 0; border-top:1px solid var(--line) }
+    .person:first-child { border-top:0 }
+    .number { width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center; border-radius:50%; background:#edf5ef; color:#17633f; font-weight:700 }
+    .name { flex:1; min-width:0; overflow-wrap:anywhere; font-weight:550 }
+    .place { color:var(--muted); font-size:13px }
+    .empty { padding:22px; border:1px dashed #cbd7ce; border-radius:10px; text-align:center; color:var(--muted) }
+    .notice { min-height:24px; margin:14px 0 0; color:var(--green); font-weight:600 }
+    footer { text-align:center; color:var(--muted); font-size:13px; margin-top:22px }
+    @media(max-width:520px) { main { margin:28px auto } .card { padding:18px } form { flex-direction:column } form button { width:100% } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Customer Service Queue</h1>
+      <p>Keep the line organized and serve each customer in arrival order.</p>
+    </header>
+    <section class="card" aria-label="Manage customer line">
+      <div class="top"><strong>Service desk</strong><span class="pill" id="count">0 people waiting</span></div>
+      <form id="customer-form">
+        <input id="customer-name" maxlength="60" placeholder="Enter a customer name" aria-label="Customer name" required>
+        <button type="submit">Join the line</button>
+      </form>
+      <div class="actions">
+        <button id="serve-next" type="button">Serve next customer</button>
+        <button id="clear-line" class="secondary" type="button">Clear the line</button>
+      </div>
+      <p id="notice" class="notice" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card" aria-labelledby="line-title">
+      <h2 id="line-title">Customers waiting</h2>
+      <div id="line-view"></div>
+    </section>
+    <footer>First customer to join is the next customer served (FIFO).</footer>
+  </main>
+  <script>
+    const line = [];
+    const form = document.querySelector('#customer-form');
+    const input = document.querySelector('#customer-name');
+    const view = document.querySelector('#line-view');
+    const count = document.querySelector('#count');
+    const notice = document.querySelector('#notice');
+    const serveButton = document.querySelector('#serve-next');
+    const clearButton = document.querySelector('#clear-line');
+
+    function render() {
+      const total = line.length;
+      count.textContent = `${total} ${total === 1 ? 'person' : 'people'} waiting`;
+      serveButton.disabled = total === 0;
+      clearButton.disabled = total === 0;
+      if (!total) {
+        view.innerHTML = '<div class="empty">Nobody is waiting. Add a customer to start the line.</div>';
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      line.forEach((name, index) => {
+        const row = document.createElement('div');
+        row.className = 'person';
+        const number = document.createElement('span');
+        number.className = 'number';
+        number.textContent = index + 1;
+        const label = document.createElement('span');
+        label.className = 'name';
+        label.textContent = name;
+        const place = document.createElement('span');
+        place.className = 'place';
+        place.textContent = index === 0 ? 'Next' : 'Waiting';
+        row.append(number, label, place);
+        fragment.append(row);
+      });
+      view.replaceChildren(fragment);
+    }
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const name = input.value.trim();
+      if (!name) return;
+      line.push(name);
+      notice.textContent = `${name} joined the line.`;
+      input.value = '';
+      input.focus();
+      render();
+    });
+
+    serveButton.addEventListener('click', () => {
+      const name = line.shift();
+      if (name) notice.textContent = `Now serving ${name}.`;
+      render();
+    });
+
+    clearButton.addEventListener('click', () => {
+      line.length = 0;
+      notice.textContent = 'The line has been cleared.';
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
